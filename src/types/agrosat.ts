@@ -2,6 +2,8 @@ export type StatusMonitoramento = 'saudavel' | 'atencao' | 'critico'
 export type StatusAlerta = 'ATIVO' | 'RESOLVIDO'
 export type SeveridadeAlerta = 'baixa' | 'media' | 'alta'
 export type FiltroAlerta = 'todos' | 'ativos' | 'criticos' | 'resolvidos'
+export type FiltroRelatorio = 'todos' | 'saudaveis' | 'atencao' | 'criticos'
+export type PeriodoRelatorio = '7d' | '15d' | '30d'
 
 export interface PropriedadeAgricola {
   id: number
@@ -56,4 +58,46 @@ export interface AlertaGerado {
   idTalhao: number
   talhao: string
   propriedade: string
+}
+
+export interface RelatorioTalhao {
+  id: number
+  talhao: string
+  propriedade: string
+  ndviMedio: number
+  menorNdvi: number
+  maiorNdvi: number
+  status: StatusMonitoramento
+  ultimaCaptura: string
+  sateliteOrigem: string
+  recomendacao: string
+  historico: number[]
+}
+
+export interface CapturaRelatorio extends CapturaSatelite {
+  resolucao: string
+  tipoImagem: string
+  talhoesAnalisados: number
+}
+
+export interface DashboardResumo {
+  propriedadesMonitoradas: number
+  talhoesAtivos: number
+  ndviMedioGeral: number
+  alertasAtivos: number
+  capturasAnalisadas: number
+  talhoesCriticos: number
+}
+
+export interface SaudeGeral {
+  saudaveis: number
+  atencao: number
+  criticos: number
+}
+
+export interface AcaoRapidaDashboard {
+  titulo: string
+  descricao: string
+  rota: string
+  destaque: 'green' | 'blue' | 'alert' | 'critical'
 }
