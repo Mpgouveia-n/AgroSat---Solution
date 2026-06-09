@@ -128,7 +128,9 @@ function criarRecomendacao(status: StatusMonitoramento) {
   return 'Indicadores positivos. Continuar acompanhamento de produtividade estimada.'
 }
 
-export async function listarRelatoriosTalhao(_periodo: PeriodoRelatorio) {
+export async function listarRelatoriosTalhao(periodo: PeriodoRelatorio) {
+  void periodo
+
   return withApiFallback(
     async () => {
       const [talhoes, historico, capturas] = await Promise.all([
