@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-agrosat-green: #22c55e;
+  --color-agrosat-blue: #0ea5e9;
+  --color-agrosat-space: #0f172a;
+  --color-agrosat-card: #1e293b;
+  --color-agrosat-text: #f8fafc;
+  --color-agrosat-alert: #facc15;
+  --color-agrosat-critical: #ef4444;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #0f172a;
+  color: #f8fafc;
+}
