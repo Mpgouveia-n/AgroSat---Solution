@@ -1,4 +1,7 @@
 export type StatusMonitoramento = 'saudavel' | 'atencao' | 'critico'
+export type StatusAlerta = 'ATIVO' | 'RESOLVIDO'
+export type SeveridadeAlerta = 'baixa' | 'media' | 'alta'
+export type FiltroAlerta = 'todos' | 'ativos' | 'criticos' | 'resolvidos'
 
 export interface PropriedadeAgricola {
   id: number
@@ -40,4 +43,17 @@ export interface TalhaoMonitoramento extends TalhaoZona {
   ndviAtual: number
   status: StatusMonitoramento
   ultimaCaptura: CapturaSatelite
+}
+
+export interface AlertaGerado {
+  id: number
+  tipo: string
+  descricao: string
+  recomendacao: string
+  severidade: SeveridadeAlerta
+  status: StatusAlerta
+  dataGeracao: string
+  idTalhao: number
+  talhao: string
+  propriedade: string
 }
