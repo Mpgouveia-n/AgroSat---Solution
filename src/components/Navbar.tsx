@@ -5,12 +5,12 @@ import agrosatLogo from '../assets/images/logo-agrosat-symbol.png'
 const navLinks = [
   { label: 'Home', path: '/' },
   { label: 'Sobre', path: '/sobre' },
-  { label: 'Tecnologia', path: '/tecnologia' },
   { label: 'FAQ', path: '/faq' },
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Monitoramento', path: '/monitoramento' },
   { label: 'Alertas', path: '/alertas' },
   { label: 'Relatórios', path: '/relatorios' },
+  { label: 'Integrantes', path: '/integrantes' },
 ]
 
 function Navbar() {

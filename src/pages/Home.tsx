@@ -71,7 +71,7 @@ function Home() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                to="/tecnologia"
+                to="/sobre"
                 className="rounded-md bg-agrosat-green px-5 py-3 text-center text-sm font-bold text-agrosat-space transition hover:bg-green-300"
               >
                 Conhecer Solução

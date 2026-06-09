@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom'
 
 const quickLinks = [
   { label: 'Sobre', path: '/sobre' },
-  { label: 'Tecnologia', path: '/tecnologia' },
+  { label: 'FAQ', path: '/faq' },
   { label: 'Monitoramento', path: '/monitoramento' },
   { label: 'Relatórios', path: '/relatorios' },
+  { label: 'Integrantes', path: '/integrantes' },
 ]
 
 function Footer() {
