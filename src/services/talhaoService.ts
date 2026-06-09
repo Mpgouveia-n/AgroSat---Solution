@@ -1,4 +1,5 @@
-import type { HistoricoNdvi, TalhaoMonitoramento } from '../types/agrosat'
+import type { HistoricoNdvi, StatusMonitoramento, TalhaoMonitoramento, TalhaoZona } from '../types/agrosat'
+import { get, withApiFallback } from './apiClient'
 import { listarCapturas } from './capturaService'
 
 const historicoNdviMock: HistoricoNdvi[] = [
@@ -14,7 +15,23 @@ const historicoNdviMock: HistoricoNdvi[] = [
   { id: 10, valorNdvi: 0.45, dataAnalise: '2025-03-07', idTalhao: 10, idCaptura: 2 },
 ]
 
-export async function listarTalhoesMonitorados() {
+function classificarStatus(ndvi: number): StatusMonitoramento {
+  if (ndvi < 0.3) {
+    return 'critico'
+  }
+
+  if (ndvi < 0.6) {
+    return 'atencao'
+  }
+
+  return 'saudavel'
+}
+
+function getHistoricoMaisRecente(historico: HistoricoNdvi[]) {
+  return [...historico].sort((a, b) => b.dataAnalise.localeCompare(a.dataAnalise))[0]
+}
+
+async function listarTalhoesMonitoradosMock() {
   const capturas = await listarCapturas()
 
   const talhoes: Omit<TalhaoMonitoramento, 'ultimaCaptura'>[] = [
@@ -123,5 +140,40 @@ export async function listarTalhoesMonitorados() {
 }
 
 export async function listarHistoricoNdviPorTalhao(idTalhao: number) {
-  return historicoNdviMock.filter((item) => item.idTalhao === idTalhao)
+  return withApiFallback(
+    () => get<HistoricoNdvi[]>(`/talhoes/${idTalhao}/historico-ndvi`),
+    () => historicoNdviMock.filter((item) => item.idTalhao === idTalhao),
+    `Falha ao listar histórico NDVI do talhão ${idTalhao}`,
+  )
+}
+
+export async function listarTalhoesMonitorados() {
+  return withApiFallback(
+    async () => {
+      const [talhoes, capturas] = await Promise.all([
+        get<TalhaoZona[]>('/talhoes'),
+        listarCapturas(),
+      ])
+
+      return Promise.all(
+        talhoes.map(async (talhao) => {
+          const historico = await get<HistoricoNdvi[]>(`/talhoes/${talhao.id}/historico-ndvi`)
+          const ultimoHistorico = getHistoricoMaisRecente(historico)
+          const ndviAtual = ultimoHistorico?.valorNdvi ?? 0
+          const ultimaCaptura =
+            capturas.find((captura) => captura.id === ultimoHistorico?.idCaptura) ?? capturas[0]
+
+          return {
+            ...talhao,
+            areaMonitorada: 10 + talhao.id * 3,
+            ndviAtual,
+            status: classificarStatus(ndviAtual),
+            ultimaCaptura,
+          }
+        }),
+      )
+    },
+    listarTalhoesMonitoradosMock,
+    'Falha ao listar talhões monitorados',
+  )
 }

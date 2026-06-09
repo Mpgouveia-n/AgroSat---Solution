@@ -1,4 +1,12 @@
-import type { CapturaRelatorio, PeriodoRelatorio, RelatorioTalhao } from '../types/agrosat'
+import type {
+  CapturaRelatorio,
+  HistoricoNdvi,
+  PeriodoRelatorio,
+  RelatorioTalhao,
+  StatusMonitoramento,
+  TalhaoZona,
+} from '../types/agrosat'
+import { get, withApiFallback } from './apiClient'
 import { listarCapturas } from './capturaService'
 
 const relatoriosMock: RelatorioTalhao[] = [
@@ -96,27 +104,108 @@ const capturaDetalhes = [
   { resolucao: '30 m', tipoImagem: 'Multiespectral', talhoesAnalisados: 4 },
 ]
 
+function classificarStatus(ndvi: number): StatusMonitoramento {
+  if (ndvi < 0.3) {
+    return 'critico'
+  }
+
+  if (ndvi < 0.6) {
+    return 'atencao'
+  }
+
+  return 'saudavel'
+}
+
+function criarRecomendacao(status: StatusMonitoramento) {
+  if (status === 'critico') {
+    return 'Priorizar inspeção em campo. NDVI abaixo de 0.30 indica risco crítico de anomalia.'
+  }
+
+  if (status === 'atencao') {
+    return 'Monitorar tendência de queda e verificar irrigação, solo e sinais de pragas.'
+  }
+
+  return 'Indicadores positivos. Continuar acompanhamento de produtividade estimada.'
+}
+
 export async function listarRelatoriosTalhao(_periodo: PeriodoRelatorio) {
-  return relatoriosMock
+  return withApiFallback(
+    async () => {
+      const [talhoes, historico, capturas] = await Promise.all([
+        get<TalhaoZona[]>('/talhoes'),
+        get<HistoricoNdvi[]>('/historico-ndvi'),
+        listarCapturas(),
+      ])
+
+      return talhoes.map((talhao) => {
+        const historicoTalhao = historico
+          .filter((item) => item.idTalhao === talhao.id)
+          .sort((a, b) => a.dataAnalise.localeCompare(b.dataAnalise))
+
+        const valores = historicoTalhao.map((item) => item.valorNdvi)
+        const ndviMedio =
+          valores.length > 0 ? valores.reduce((total, valor) => total + valor, 0) / valores.length : 0
+        const menorNdvi = valores.length > 0 ? Math.min(...valores) : 0
+        const maiorNdvi = valores.length > 0 ? Math.max(...valores) : 0
+        const status = classificarStatus(ndviMedio)
+        const ultimoHistorico = historicoTalhao.at(-1)
+        const ultimaCaptura =
+          capturas.find((captura) => captura.id === ultimoHistorico?.idCaptura) ?? capturas[0]
+
+        return {
+          id: talhao.id,
+          talhao: talhao.identificacaoBloco,
+          propriedade: `Propriedade #${talhao.idPropriedade}`,
+          ndviMedio,
+          menorNdvi,
+          maiorNdvi,
+          status,
+          ultimaCaptura: ultimoHistorico?.dataAnalise ?? ultimaCaptura?.dataImagem ?? '-',
+          sateliteOrigem: ultimaCaptura?.sateliteOrigem ?? 'Satélite não informado',
+          recomendacao: criarRecomendacao(status),
+          historico: valores.slice(-4),
+        }
+      })
+    },
+    () => relatoriosMock,
+    'Falha ao montar relatórios por talhão',
+  )
 }
 
 export async function listarHistoricoNdvi() {
-  return relatoriosMock.flatMap((relatorio) =>
-    relatorio.historico.map((valorNdvi, index) => ({
-      id: relatorio.id * 10 + index,
-      valorNdvi,
-      dataAnalise: `2025-03-0${index + 1}`,
-      idTalhao: relatorio.id,
-      idCaptura: index + 1,
-    })),
+  return withApiFallback(
+    () => get<HistoricoNdvi[]>('/historico-ndvi'),
+    () =>
+      relatoriosMock.flatMap((relatorio) =>
+        relatorio.historico.map((valorNdvi, index) => ({
+          id: relatorio.id * 10 + index,
+          valorNdvi,
+          dataAnalise: `2025-03-0${index + 1}`,
+          idTalhao: relatorio.id,
+          idCaptura: index + 1,
+        })),
+      ),
+    'Falha ao listar histórico NDVI',
   )
 }
 
 export async function listarCapturasRelatorio(): Promise<CapturaRelatorio[]> {
-  const capturas = await listarCapturas()
+  return withApiFallback(
+    async () => {
+      const capturas = await listarCapturas()
 
-  return capturas.map((captura, index) => ({
-    ...captura,
-    ...capturaDetalhes[index],
-  }))
+      return capturas.map((captura, index) => ({
+        ...captura,
+        ...capturaDetalhes[index % capturaDetalhes.length],
+      }))
+    },
+    () =>
+      relatoriosMock.map((relatorio, index) => ({
+        id: index + 1,
+        dataImagem: relatorio.ultimaCaptura,
+        sateliteOrigem: relatorio.sateliteOrigem,
+        ...capturaDetalhes[index % capturaDetalhes.length],
+      })),
+    'Falha ao listar capturas para relatórios',
+  )
 }

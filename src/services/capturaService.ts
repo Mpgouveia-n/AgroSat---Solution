@@ -1,4 +1,5 @@
 import type { CapturaSatelite } from '../types/agrosat'
+import { get, withApiFallback } from './apiClient'
 
 const capturasMock: CapturaSatelite[] = [
   { id: 1, dataImagem: '2025-01-10', sateliteOrigem: 'Sentinel-2' },
@@ -12,5 +13,9 @@ const capturasMock: CapturaSatelite[] = [
 ]
 
 export async function listarCapturas() {
-  return capturasMock
+  return withApiFallback(
+    () => get<CapturaSatelite[]>('/capturas'),
+    () => capturasMock,
+    'Falha ao listar capturas',
+  )
 }

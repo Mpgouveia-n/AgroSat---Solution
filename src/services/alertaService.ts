@@ -1,4 +1,13 @@
 import type { AlertaGerado } from '../types/agrosat'
+import { get, put, withApiFallback } from './apiClient'
+
+type ApiAlertaGerado = {
+  id: number
+  descricao: string
+  status: 'ATIVO' | 'RESOLVIDO'
+  data: string
+  idTalhao: number
+}
 
 const alertasMock: AlertaGerado[] = [
   {
@@ -87,23 +96,80 @@ const alertasMock: AlertaGerado[] = [
   },
 ]
 
+function inferirSeveridade(descricao: string): AlertaGerado['severidade'] {
+  const descricaoNormalizada = descricao.toLowerCase()
+
+  if (descricaoNormalizada.includes('crit') || descricaoNormalizada.includes('baixo indice')) {
+    return 'alta'
+  }
+
+  if (descricaoNormalizada.includes('queda') || descricaoNormalizada.includes('estresse')) {
+    return 'media'
+  }
+
+  return 'baixa'
+}
+
+function adaptarAlertaDaApi(alerta: ApiAlertaGerado): AlertaGerado {
+  const severidade = inferirSeveridade(alerta.descricao)
+
+  return {
+    id: alerta.id,
+    tipo: severidade === 'alta' ? 'Alerta crítico de NDVI' : 'Alerta de monitoramento',
+    descricao: alerta.descricao,
+    recomendacao:
+      severidade === 'alta'
+        ? 'Priorizar inspeção em campo e validar a condição da vegetação no talhão indicado.'
+        : 'Acompanhar a próxima captura orbital e comparar com o histórico NDVI.',
+    severidade,
+    status: alerta.status,
+    dataGeracao: alerta.data,
+    idTalhao: alerta.idTalhao,
+    talhao: `Talhão #${alerta.idTalhao}`,
+    propriedade: 'Propriedade vinculada',
+  }
+}
+
 export async function listarAlertas() {
-  return alertasMock
+  return withApiFallback(
+    async () => {
+      const alertas = await get<ApiAlertaGerado[]>('/alertas')
+      return alertas.map(adaptarAlertaDaApi)
+    },
+    () => alertasMock,
+    'Falha ao listar alertas',
+  )
 }
 
 export async function listarAlertasAtivos() {
-  return alertasMock.filter((alerta) => alerta.status === 'ATIVO')
+  return withApiFallback(
+    async () => {
+      const alertas = await get<ApiAlertaGerado[]>('/alertas/ativos')
+      return alertas.map(adaptarAlertaDaApi)
+    },
+    () => alertasMock.filter((alerta) => alerta.status === 'ATIVO'),
+    'Falha ao listar alertas ativos',
+  )
 }
 
 export async function resolverAlerta(id: number) {
-  const alerta = alertasMock.find((item) => item.id === id)
+  return withApiFallback(
+    async () => {
+      const alerta = await put<ApiAlertaGerado>(`/alertas/${id}/resolver`)
+      return adaptarAlertaDaApi(alerta)
+    },
+    () => {
+      const alerta = alertasMock.find((item) => item.id === id)
 
-  if (!alerta) {
-    throw new Error('Alerta não encontrado.')
-  }
+      if (!alerta) {
+        throw new Error('Alerta não encontrado.')
+      }
 
-  return {
-    ...alerta,
-    status: 'RESOLVIDO' as const,
-  }
+      return {
+        ...alerta,
+        status: 'RESOLVIDO' as const,
+      }
+    },
+    `Falha ao resolver alerta ${id}`,
+  )
 }

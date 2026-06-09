@@ -1,4 +1,11 @@
-import type { PropriedadeMonitoramento } from '../types/agrosat'
+import type {
+  HistoricoNdvi,
+  PropriedadeAgricola,
+  PropriedadeMonitoramento,
+  StatusMonitoramento,
+  TalhaoZona,
+} from '../types/agrosat'
+import { get, withApiFallback } from './apiClient'
 
 const propriedadesMock: PropriedadeMonitoramento[] = [
   {
@@ -63,6 +70,55 @@ const propriedadesMock: PropriedadeMonitoramento[] = [
   },
 ]
 
+function classificarStatus(ndvi: number): StatusMonitoramento {
+  if (ndvi < 0.3) {
+    return 'critico'
+  }
+
+  if (ndvi < 0.6) {
+    return 'atencao'
+  }
+
+  return 'saudavel'
+}
+
+async function calcularNdviMedioDaPropriedade(talhoes: TalhaoZona[]) {
+  const historicos = await Promise.all(
+    talhoes.map((talhao) => get<HistoricoNdvi[]>(`/talhoes/${talhao.id}/historico-ndvi`)),
+  )
+
+  const ultimosValores = historicos
+    .map((historico) => [...historico].sort((a, b) => b.dataAnalise.localeCompare(a.dataAnalise))[0])
+    .filter(Boolean)
+    .map((historico) => historico.valorNdvi)
+
+  if (ultimosValores.length === 0) {
+    return 0
+  }
+
+  return ultimosValores.reduce((total, valor) => total + valor, 0) / ultimosValores.length
+}
+
 export async function listarPropriedadesMonitoradas() {
-  return propriedadesMock
+  return withApiFallback(
+    async () => {
+      const propriedades = await get<PropriedadeAgricola[]>('/propriedades')
+
+      return Promise.all(
+        propriedades.map(async (propriedade) => {
+          const talhoes = await get<TalhaoZona[]>(`/propriedades/${propriedade.id}/talhoes`)
+          const ndviMedio = await calcularNdviMedioDaPropriedade(talhoes)
+
+          return {
+            ...propriedade,
+            totalTalhoes: talhoes.length,
+            ndviMedio,
+            statusGeral: classificarStatus(ndviMedio),
+          }
+        }),
+      )
+    },
+    () => propriedadesMock,
+    'Falha ao listar propriedades monitoradas',
+  )
 }
